@@ -1,0 +1,47 @@
+{
+  "skill_name": "design-creator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm building a task management app called 'TaskFlow' for remote teams. The app helps distributed teams track sprints, assign tasks, and visualize progress with kanban boards. Target audience is tech-savvy professionals aged 25-45 who work remotely. Create the complete visual identity and design system for this product.",
+      "expected_output": "Design.md file in the working directory with color palette (light + dark), typography, iconography, spacing system, border radii, shadows, and brand identity sections",
+      "files": [],
+      "expectations": [
+        "Creates a Design.md file in the current working directory",
+        "Design.md contains a JSON design tokens block with colors, typography, spacing, borderRadius, shadows",
+        "Design.md includes both light and dark color palettes",
+        "Design.md specifies at least one font family from Google Fonts",
+        "Design.md specifies an icon style and recommended library",
+        "Design.md includes a spacing scale with at least 4 levels",
+        "Design.md includes a border radius scale",
+        "The color palette has sufficient contrast for readability"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I'm working on a project management web app. I have a Design.md with my visual identity already set up. I need to design a profile dropdown menu that has edit profile, settings, and logout items. What should it look like? Make sure it fits with the existing design language.",
+      "expected_output": "The skill checks if a 'Profile Dropdown' or similar component already exists in Design.md. If not, it designs one using existing design tokens and appends it to Design.md.",
+      "files": [],
+      "expectations": [
+        "Checks if a profile dropdown component already exists before creating it",
+        "Designs the dropdown using existing design tokens from Design.md (or creates Design.md first if it doesn't exist)",
+        "The dropdown design includes properties derived from the token set (colors, spacing, radii, shadows from tokens)",
+        "The dropdown has at minimum Default, Hover, and Disabled states defined",
+        "The dropdown design is appended to Design.md under the Components section",
+        "Uses the design_tool.py script to check and append components"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I already have a Design.md with a complete design system for my e-commerce app. The design already includes buttons, cards, and a navbar. Now someone on my team wants me to design a button. But I think we already have that. Check if the button is already designed and tell me what to do.",
+      "expected_output": "The skill checks if 'Button' exists in Design.md and reports that it's already designed, without creating a duplicate.",
+      "files": [],
+      "expectations": [
+        "Uses the design_tool.py check command to verify if Button exists in Design.md",
+        "If Button already exists (or if Design.md doesn't exist yet, creates one first then checks), does NOT create a duplicate design",
+        "Informs the user that Button is already designed rather than redesigning it",
+        "Does not overwrite or duplicate existing component designs"
+      ]
+    }
+  ]
+}
