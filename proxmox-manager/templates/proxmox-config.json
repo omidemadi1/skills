@@ -1,0 +1,9 @@
+{
+  "host": "https://YOUR_PROXMOX_HOST:8006",
+  "token_id": "YOUR_USER@YOUR_REALM!YOUR_TOKEN_NAME",
+  "token_secret": "YOUR_TOKEN_SECRET_UUID",
+  "node": "YOUR_NODE_NAME",
+  "storage": "YOUR_DEFAULT_STORAGE",
+  "bridge": "YOUR_DEFAULT_BRIDGE",
+  "verify_ssl": false
+}
