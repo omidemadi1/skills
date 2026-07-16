@@ -1,8 +1,8 @@
 {
   "host": "https://192.168.1.10:8006",
-  "token_id": "hermesagent@pve!admin",
-  "token_secret": "a2c5b367-b621-4cb4-a87d-849f75f07f3a",
-  "node": "homeserver",
+  "token_id": "hermes@pam!agentic",
+  "token_secret": "63ade9f1-1d14-4b78-ae6e-52ccf39341e5",
+  "node": "Proxmox-SRV",
   "storage": "local-lvm",
   "bridge": "vmbr0",
   "verify_ssl": false

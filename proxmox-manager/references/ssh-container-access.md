@@ -73,3 +73,39 @@ sshpass -p '<password>' ssh root@<container-ip> "apk add nginx"
 - Container IP is static if configured in Proxmox (`ip=192.168.1.110/24,gw=192.168.1.10`)
 - Bridge: typically `vmbr0` on the Proxmox host
 - Firewall: Proxmox firewall may be enabled on the container interface (`firewall=1` in net0 config)
+
+## "Failed password" even with correct user/pass (root login blocked)
+Symptom: `ssh root@<ct-ip>` fails with `Permission denied (publickey,password)` on your
+laptop, yet the container is reachable (sshd running, port 22 open, no PVE firewall rule
+blocking it), and `auth.log` shows `Failed password for root from <your-laptop-ip>`.
+
+Root cause: `/etc/ssh/sshd_config` has every relevant directive commented out, so sshd
+falls back to its compiled default `PermitRootLogin prohibit-password` — root may log in
+with a KEY only, password is refused. This is easy to hit on Ubuntu/Debian LXC templates
+where the shipped config leaves these lines commented. (Network, gateway, IP, and the
+password were all fine — the auth path was just closed.)
+
+Verify from the host (use `pct exec` since API exec is 501 on PVE 9):
+```bash
+ssh root@<proxmox-host> "pct exec <vmid> -- sshd -T | grep -iE 'permitrootlogin|passwordauth'"
+# expect: permitrootlogin prohibit-password  <- THIS IS THE BUG
+```
+
+Fix (apply inside the container, then restart sshd):
+```bash
+sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin yes/;
+        s/^#\?PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+systemctl restart ssh sshd     # Debian/Ubuntu
+# rc-service sshd restart      # Alpine (OpenRC)
+# verify:
+sshd -T | grep -iE 'permitrootlogin|passwordauth'
+# expect: permitrootlogin yes / passwordauthentication yes
+```
+
+Notes
+- If `PermitRootLogin prohibit-password` is correct by policy, install an SSH key instead
+  (`ssh-copy-id root@<ct-ip>`) — do NOT enable password root login just to make SSH work.
+- A key in `/etc/ssh/sshd_config.d/*.conf` can override the main file; check there too.
+- First confirm the real symptom before changing anything: is sshd listening? (`ss -tlnp | grep :22`)
+  Is the port reachable from the host? (`cat < /dev/null > /dev/tcp/<ct-ip>/22`) Is there a
+  PVE firewall rule (`/etc/pve/firewall/101.fw`)? Only then blame sshd_config.

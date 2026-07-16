@@ -145,7 +145,7 @@ All operations use `scripts/proxmox_api.py`:
 | `validate` | Test config and API connectivity |
 | `discover` / `cache [category]` | Cache management |
 | `list vms` / `list containers` | List all VMs / containers |
-| `list templates` / `list isos` | Available CT templates / ISO images |
+| `list templates --storage <name>` / `list isos` | Available CT templates / ISO images |
 | `status node` | Node CPU, RAM, disk |
 | `status vm <vmid>` / `status ct <vmid>` | VM or container details |
 | `create vm <options>` | Create a new VM |
@@ -191,14 +191,31 @@ When the user doesn't specify exact specs, propose a configuration and **ask for
 
 **VM vs LXC:** Prefer LXC for single-purpose, web, dev, or CI workloads. Use VM for custom kernels, Docker-in-Docker, Windows, or strong isolation. If unsure, propose LXC.
 
-**Templates/ISOs:** Run `list templates` or `list isos` to see what's available. Prefer Ubuntu 22.04/24.04 or Debian 12 for LXC. Enable `agent=1` on VMs for Guest Agent support.
+**Templates/ISOs:** Run `list templates --storage <name>` or `list isos` to see what's available. Templates may be on a non-default storage — check all storages with `vztmpl` content. Prefer Ubuntu 22.04/24.04 or Debian 12 for LXC. Enable `agent=1` on VMs for Guest Agent support.
 
 ## Core Operations
 
+### Guest Command Execution
+
+**Preferred:** API exec endpoint (fast, no extra credentials)
+```bash
+python scripts/proxmox_api.py exec lxc <vmid> "command"
+python scripts/proxmox_api.py exec qemu <vmid> "command"
+```
+
+**Fallback:** When API exec returns **501 Not Implemented** or **403 Permission Denied**
+- Use the **Proxmox host shell** (`pct exec` for LXC, `qm guest exec` for VMs):
+  ```bash
+  ssh root@<proxmox-host> "pct exec <vmid> -- <command>"
+  ```
+- `pct exec` works even when the API exec endpoint is disabled
+- See `references/ssh-fallback.md` for credential management
+- See `references/docker-lxc-prep.md` for Docker-in-LXC setup
+
 **Pitfalls & Workarounds**
-- The `exec` API endpoint may return **HTTP 501 Not Implemented**. Fall back to SSH.
-- When using an API token, the token must have `VM.Console` permission to run `pct exec` commands. Otherwise **403 Permission check failed**.
-- Refer to `references/exec-not-implemented.md` and `references/permission-debugging.md` for details.
+- The `exec` API endpoint may return **HTTP 501 Not Implemented** → use `pct exec` on the host
+- When using an API token, the token must have `VM.Console` permission → otherwise **403 Permission check failed**
+- Refer to `references/exec-not-implemented.md` and `references/permission-debugging.md` for details
 
 ### Listing & Status
 ```bash
@@ -239,7 +256,7 @@ python scripts/proxmox_api.py stop 100       # force
 python scripts/proxmox_api.py delete 100
 ```
 
-### Guest Command Execution
+### Guest Command Execution (detailed)
 ```bash
 # LXC (API preferred)
 python scripts/proxmox_api.py exec lxc 200 "systemctl start nginx"
@@ -257,7 +274,87 @@ Run commands sequentially for multi-step setups — check output at each step.
 
 **Tailscale in LXC:** Requires TUN device access. See `references/tailscale-tun-setup.md`.
 
-## Troubleshooting
+## Known Issues & Fixes
+
+### 1. Gateway Defaults to Wrong IP
+**Symptom:** LXC/VM with static IP cannot reach the internet or LAN.
+**Cause:** The skill defaults to `gw=192.168.1.1`, but the Proxmox node uses `192.168.1.10`.
+**Fix:**
+- Always use the Proxmox node's IP as the gateway (detected automatically during creation if no gateway specified)
+- If the user specifies a gateway, use it; otherwise, use the node's `vmbr0` IP
+- Saved to memory: `Proxmox gateway for LXC/VM static IPs is the Proxmox server IP (192.168.1.10)`
+
+### 2. `keyctl=1` Feature Flag Requires root@pam
+**Symptom:** API returns **403 Permission check failed** when setting `features=keyctl=1`.
+**Cause:** Only `root@pam` can set the `keyctl` feature flag — API tokens (even Administrator) cannot.
+**Fix:**
+- Use `nesting=1` only (sufficient for Docker)
+- If `keyctl=1` is needed, edit `/etc/pve/lxc/<vmid>.conf` on the host manually:
+  ```
+  features: nesting=1,keyctl=1
+  ```
+- Or use the root shell on the host:
+  ```bash
+  pct set <vmid> -features nesting=1,keyctl=1
+  ```
+
+### 3. API Exec Endpoint Returns 501
+**Symptom:** `exec lxc` or `exec qemu` returns **501 Not Implemented**.
+**Cause:** The exec endpoint is disabled on some Proxmox installations.
+**Fix:**
+- Use `pct exec` on the Proxmox host (works even when API exec is disabled):
+  ```bash
+  ssh root@<proxmox-host> "pct exec <vmid> -- <command>"
+  ```
+- See `references/exec-not-implemented.md` and `references/docker-lxc-prep.md`
+
+### 4. Template Search Fails
+**Symptom:** `list templates` returns no results, even though templates exist on a non-default storage.
+**Cause:** The skill only checks the default storage for templates.
+**Fix:**
+- Search all storages with `vztmpl` content explicitly:
+  ```bash
+  python scripts/proxmox_api.py list templates --storage <name>
+  ```
+- Or query the API directly for each storage with `vztmpl` content type
+
+### 6. SSH Login Refused Despite Correct User/Password
+**Symptom:** `ssh root@<ct-ip>` fails with `Permission denied (publickey,password)` on your laptop, yet the container is reachable (sshd running, port 22 open, no PVE firewall rule blocking it), and `auth.log` shows `Failed password for root from <your-laptop-ip>`.
+
+**Cause:** `/etc/ssh/sshd_config` has every relevant directive commented out, so sshd falls back to its compiled default `PermitRootLogin prohibit-password` — root may log in with a KEY only, password is refused. This is easy to hit on Ubuntu/Debian LXC templates where the shipped config leaves these lines commented. (Network, gateway, IP, and the password were all fine — the auth path was just closed.)
+
+**Fix:**
+```bash
+# From the Proxmox host (pct exec works even when API exec is 501):
+pct exec <vmid> -- sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin yes/; \
+                                s/^#\?PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+pct exec <vmid> -- systemctl restart ssh sshd   # Debian/Ubuntu
+# pct exec <vmid> -- rc-service sshd restart    # Alpine (OpenRC)
+
+# Verify:
+pct exec <vmid> -- sshd -T | grep -iE 'permitrootlogin|passwordauth'
+# expect: permitrootlogin yes / passwordauthentication yes
+```
+
+**Notes:**
+- If `PermitRootLogin prohibit-password` is correct by policy, install an SSH key instead (`ssh-copy-id root@<ct-ip>`) — do NOT enable password root login just to make SSH work.
+- A key in `/etc/ssh/sshd_config.d/*.conf` can override the main file; check there too.
+- First confirm the real symptom before changing anything: is sshd listening? (`ss -tlnp | grep :22`) Is the port reachable from the host? (`cat < /dev/null > /dev/tcp/<ct-ip>/22`) Is there a PVE firewall rule (`/etc/pve/firewall/101.fw`)? Only then blame sshd_config.
+
+See `references/ssh-container-access.md` for full SSH troubleshooting.
+
+
+### 7. apk Lock Contention (Alpine LXC)
+**Symptom:** `apk add` fails with "Unable to lock database: Resource temporarily unavailable".
+**Cause:** A previous `pct exec` command timed out but left apk holding the lock.
+**Fix:**
+```bash
+# On the Proxmox host:
+pct exec <vmid> -- ps aux | grep apk          # find stale PID
+pct exec <vmid> -- kill -9 <pid>              # kill it
+pct exec <vmid> -- rm -f /var/lib/apk/db/lock # clear lock
+```
+Then retry. On slow networks, run the install in the background and poll `/tmp/inst.log`.
 
 When a problem is reported:
 1. `status vm/ct <vmid>` — check current state
@@ -270,6 +367,8 @@ When a problem is reported:
 - API token with Privilege Separation enabled but no explicit permissions granted → fix in UI or set `separate=0`
 
 **For SSH access to containers**, see `references/ssh-container-access.md` and `references/ssh-fallback.md`.
+
+**For Docker-in-LXC preparation**, see `references/docker-lxc-prep.md`.
 
 **For detailed verification curl commands**, see `references/verification-steps.md`.
 
