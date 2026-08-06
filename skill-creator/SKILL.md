@@ -44,6 +44,10 @@ It's OK to briefly explain terms if you're in doubt, and feel free to clarify te
 
 ## Creating a skill
 
+### Directory Convention
+
+New skills the agent creates go to `~/.hermes/skills/my-skills/<skill-name>/`. Do NOT save them under other category directories (e.g. `creative/`, `research/`) — those are for Hermes's own pre-made or hub-installed skills. The user's custom skills all live in `my-skills/`.
+
 ### Capture Intent
 
 Start by understanding the user's intent. The current conversation might already contain a workflow the user wants to capture (e.g., they say "turn this into a skill"). If so, extract answers from the conversation history first — the tools used, the sequence of steps, corrections the user made, input/output formats observed. The user may need to fill the gaps, and should confirm before proceeding to the next step.
