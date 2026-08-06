@@ -37,12 +37,19 @@ If you receive a 501 response with "not implemented", the endpoint is unavailabl
 
 ## Workarounds
 
-### 1. Use the Proxmox Web Console
+### 1. Use `pct exec` on the Proxmox Host (preferred for LXC)
+The container exec endpoint is disabled, but `pct exec` still works on the host:
+```bash
+ssh root@<proxmox-host> "pct exec <vmid> -- <command>"
+```
+This is the most reliable workaround — it requires only host SSH access (root).
+
+### 2. Use the Proxmox Web Console
 - Navigate to Node → LXC/CTID → Console in the web UI
 - Provides direct shell access
 - No API token permissions needed beyond console access
 
-### 2. Startup/Hook Scripts
+### 3. Startup/Hook Scripts
 Configure the container to run commands on boot:
 
 ```bash

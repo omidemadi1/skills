@@ -307,22 +307,24 @@ def cmd_list(args, config):
                   f"{ct.get('status', '?'):<10} {ct.get('mem', 0)//1024//1024 if ct.get('mem') else 0:<8} "
                   f"{ct.get('cpus', '?'):<6}")
     elif args.list_type == "templates":
-        items = get_storage_content(config, "vztmpl")
-        if not items:
-            print("No container templates found.")
+        storage = args.storage or config["storage"]
+        items = api_request(config, "GET", f"/nodes/{config['node']}/storage/{storage}/content", params={"content": "vztmpl"})
+        if not items or not isinstance(items, list):
+            print(f"No container templates found on storage '{storage}'.")
             return
-        print("Available container templates:")
+        print(f"Available container templates on {storage}:")
         for item in sorted(items, key=lambda x: x.get("volid", "")):
             v = item.get("volid", "?")
             size = item.get("size", 0)
             size_mb = size // (1024 * 1024) if size else 0
             print(f"  {v} ({size_mb} MB)")
     elif args.list_type == "isos":
-        items = get_storage_content(config, "iso")
-        if not items:
-            print("No ISO images found.")
+        storage = args.storage or config["storage"]
+        items = api_request(config, "GET", f"/nodes/{config['node']}/storage/{storage}/content", params={"content": "iso"})
+        if not items or not isinstance(items, list):
+            print(f"No ISO images found on storage '{storage}'.")
             return
-        print("Available ISO images:")
+        print(f"Available ISO images on {storage}:")
         for item in sorted(items, key=lambda x: x.get("volid", "")):
             print(f"  {item.get('volid', '?')}")
 
@@ -381,8 +383,22 @@ def cmd_create(args, config):
     vmid = args.vmid or get_next_vmid(config)
     
     if args.create_type == "ct":
-        # Find matching template
+        # Find matching template — search default storage, then fall back to all storages
         templates = get_storage_content(config, "vztmpl")
+        if not templates:
+            # Fallback: search all storages with vztmpl content
+            try:
+                storages = api_request(config, "GET", f"/nodes/{config['node']}/storage")
+                if storages:
+                    for storage in storages:
+                        if "vztmpl" in storage.get("content", ""):
+                            storage_templates = api_request(config, "GET", f"/nodes/{config['node']}/storage/{storage['storage']}/content", params={"content": "vztmpl"})
+                            if storage_templates:
+                                templates = storage_templates
+                                break
+            except Exception:
+                pass
+        
         if args.template:
             match = [t for t in (templates or []) if args.template.lower() in t.get("volid", "").lower()]
             if not match:
@@ -403,6 +419,25 @@ def cmd_create(args, config):
                 preferred = templates
             ostemplate = preferred[0]["volid"]
         
+        # Network: detect gateway from node's vmbr0 if not specified
+        gateway = args.gateway
+        if not gateway and args.ip:
+            try:
+                networks = api_request(config, "GET", f"/nodes/{config['node']}/network")
+                if networks:
+                    for iface in networks:
+                        if iface.get("iface") == config.get("bridge", "vmbr0"):
+                            gateway = iface.get("address")
+                            break
+            except Exception:
+                pass
+        
+        net0 = f"name=eth0,bridge={config['bridge']},ip=dhcp"
+        if args.ip:
+            net0 = f"name=eth0,bridge={config['bridge']},ip={args.ip}"
+            if gateway:
+                net0 += f",gw={gateway}"
+        
         payload = {
             "vmid": vmid,
             "ostemplate": ostemplate,
@@ -411,9 +446,10 @@ def cmd_create(args, config):
             "memory": args.memory,
             "cores": args.cores,
             "hostname": args.hostname or f"ct-{vmid}",
-            "net0": f"name=eth0,bridge={config['bridge']},ip=dhcp",
+            "net0": net0,
             "start": 1,
             "unprivileged": 1,
+            "features": "nesting=1",  # Required for Docker-in-LXC
         }
         if args.password:
             payload["password"] = args.password
@@ -425,6 +461,7 @@ def cmd_create(args, config):
             print(f"Container {vmid} ({payload['hostname']}) created and started successfully.")
             print(f"Config: {args.memory}MB RAM, {args.cores} vCPU, {args.disk}G disk")
             print(f"Template: {ostemplate}")
+            print(f"Network: {net0}")
     else:
         # Create VM
         payload = {
@@ -789,6 +826,7 @@ def main():
     # list
     p_list = sub.add_parser("list")
     p_list.add_argument("list_type", choices=["vms", "containers", "templates", "isos"])
+    p_list.add_argument("--storage", help="Storage to query for templates/isos (default: config storage)")
     
     # status
     p_status = sub.add_parser("status")
@@ -807,6 +845,8 @@ def main():
     p_create.add_argument("--template", help="Container template name (CT only, partial match)")
     p_create.add_argument("--ostype", default="l26", help="OS type for VM (e.g., l26, win10)")
     p_create.add_argument("--password", help="Root password (CT only)")
+    p_create.add_argument("--ip", help="Static IP with CIDR, e.g. 192.168.1.104/24 (CT only)")
+    p_create.add_argument("--gateway", help="Gateway IP (defaults to node vmbr0 IP) (CT only)")
     
     # config
     p_config = sub.add_parser("config")

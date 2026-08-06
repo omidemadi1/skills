@@ -103,6 +103,33 @@ For basic VM/CT management, grant these privileges on path `/`:
 | `list templates` or `list isos` | `Datastore.Audit` |
 | `exec lxc <vmid> <cmd>` or `exec qemu <vmid> <cmd>` | `VM.Audit` + `VM.Console` |
 
+## Critical: Two "Permission" Errors That Are NOT Permissions
+
+### 1. `keyctl=1` → 403 "only allowed for root@pam" (even for Administrator token)
+**Root cause:** This is a HARDCODED check in `/usr/share/perl5/PVE/LXC.pm` (line ~1732):
+```perl
+"changing feature flags (except nesting) is only allowed for root@pam"
+```
+- It checks `authuser eq 'root@pam'` — meaning **password auth as root@pam**, NOT the role.
+- **API tokens CANNOT bypass this** — even a `root@pam!token` with privsep=0 gets the same 403.
+- Verified empirically: `root@pam` token → 403; `root@pam` password auth → 200.
+**Fix:** Set `keyctl=1` via host shell (not API):
+```bash
+ssh root@<host> "pct set <vmid> -features nesting=1,keyctl=1"
+# or edit /etc/pve/lxc/<vmid>.conf directly:  features: nesting=1,keyctl=1
+```
+Or just use `nesting=1` only (sufficient for Docker).
+
+### 2. `POST /nodes/{node}/lxc/{vmid}/exec` → 501 Not Implemented
+**Root cause:** The API exec endpoint **does not exist** in PVE 9.x. `pvesh ls /nodes/{node}/lxc/{vmid}` shows only `termproxy`, `vncproxy`, `status`, `config`, etc. — no `exec` subdir.
+- This is NOT a permission issue and NO token/ACL change can enable it.
+- PVE 9 removed the HTTP exec API for LXC; only `pct exec` (CLI) and web console remain.
+**Fix:** Use the host shell:
+```bash
+ssh root@<host> "pct exec <vmid> -- <command>"
+```
+For QEMU VMs, the agent exec endpoint still exists (needs `qemu-guest-agent` running + `VM.GuestAgent.*` perms).
+
 ## Troubleshooting Flow
 
 1. **Get 403 error?** → Check privilege type in error message
