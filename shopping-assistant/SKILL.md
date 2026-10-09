@@ -1,13 +1,15 @@
 ---
 name: shopping-assistant
-description: >
+description: >-
   Professional shopping assistant for product/DIY projects. When the user has a product idea
   and needs to find supplies, raw materials, tools, and equipment — use this skill. It generates
-  a complete Bill of Materials (BOM) with specs, searches Iranian sites (Digikala, Torob, Divar)
-  for best-value options, saves project files with price tracking, and learns from feedback.
+  a complete Bill of Materials (BOM) with specs, prices items through the Digikala and Torob
+  MCP servers (with site search on Iranian sites as fallback, incl. Divar), saves project
+  files with price tracking, and learns from feedback.
   Trigger whenever the user mentions making/building/creating a physical product, sourcing
   materials, finding suppliers for a DIY project, or needs a shopping list for raw materials.
-  Also trigger when asking about past projects, price tracking, or updating shopping lists.
+  Also trigger when asking about past projects, price tracking, or updating shopping lists,
+  or comparing prices/sellers on Digikala or Torob for a shopping project.
 ---
 
 # Shopping Assistant
@@ -85,24 +87,64 @@ For every significant material/component choice, present **at least 2 alternativ
 
 Let the user CHOOSE — don't decide for them unless they explicitly say "you pick."
 
-### Step 3: Search Iranian Sites — Smart Search
+### Step 3: Price Every Item — MCP First, Search as Fallback
 
-For each item in the BOM, search for the best value option on Iranian sites.
+Digikala and Torob have MCP servers that give structured, verifiable data (exact price, seller,
+stock, product URL) — far better than scraping search-result snippets. Prefer them for any
+item that could plausibly be bought on Digikala or Torob (most consumer goods, electronics,
+tools, consumables). Use web search for what they can't cover: Divar (second-hand/bulk/local),
+and specialist/custom suppliers (cuts of wood, acrylic, metal).
 
-**Search Strategy:**
+#### The MCP servers
 
+**Digikala — [sepehr071/digikala-mcp](https://github.com/sepehr071/digikala-mcp)** (chosen over the mmdju alternative: open-source MIT, runs locally on your own connection, 23 tools incl. price history and a cheapest-finder). Local stdio, needs [uv](https://docs.astral.sh/uv/), no API key:
+
+```json
+{ "mcpServers": { "digikala": { "command": "uvx", "args": ["digikala-mcp"] } } }
 ```
-# Digikala — retail, good for tools & consumables, warranty + delivery
-site:digikala.com {persian_name} {specs}
 
-# Torob — price comparison, usually cheapest for raw materials
-site:torob.com {persian_name}
+Key tools (`dk_` prefix; product id = the number in `digikala.com/product/dkp-<id>/`):
 
+| Task | Tool |
+|------|------|
+| Cheapest real match for a query (accessories filtered out) | `dk_find_cheapest` |
+| Best-rated under a budget | `dk_best_for_budget` |
+| Search with filters (price, brand, color, seller) | `dk_search` |
+| Every seller's offer for one product | `dk_product` |
+| Re-price up to 10 shortlisted products at once | `dk_shortlist` |
+| ~30 days price history + 30-day low — "is now a good time?" | `dk_price_history` |
+| Reviews / questions / seller reputation | `dk_reviews`, `dk_questions`, `dk_seller` |
+| Spec comparison of 2-4 products | `dk_compare` |
+| Deals (Incredible Offers), supermarket | `dk_deals`, `dk_fresh_search` |
+
+**Torob — [mmdju/torob-mcp](https://github.com/mmdju/torob-mcp)** (price comparison across many shops). Run it **locally** — the hosted Worker demo is rate-limited (20 calls/min) and Torob pauses it; needs Node.js and git:
+
+```json
+{ "mcpServers": { "torob": { "command": "npx", "args": ["-y", "github:mmdju/torob-mcp"] } } }
+```
+
+Key tools: `search_products` (search, filters, price window), `product_details` (every seller's offer, incl. in-person, with `price_spread_toman` — the whole point of Torob), `price_history` (Torob's own chart), `product_guide` (Torob's write-up of a model), `search_by_image`.
+
+If neither server is connected in the current client, tell the user the config blocks above and fall back to web search for now.
+
+#### MCP usage rules
+
+- **All prices are Toman.** Prices/stock move constantly — always keep the product URL in the output so the user can confirm before buying.
+- **Digikala's plain search `sort=cheapest` surfaces accessories first**; for "cheapest X" always use `dk_find_cheapest`, never bare search.
+- **A Torob search card shows one price — the cheapest offer.** Use `product_details` when the user cares about seller choice/warranty; quote `price_spread_toman`.
+- **Judge timing with price history** (`dk_price_history` / Torob `price_history`) before calling a price good.
+- Budget/quality picks → `dk_best_for_budget` (rating weighted by number of ratings) or Torob `product_guide`, not raw search.
+- Queries work in Persian and English; prefer Persian for wider recall.
+
+#### Web-search fallback (Divar, specialists, gaps)
+
+```bash
 # Divar — second-hand, bulk, local deals
 site:divar.ir {persian_name} {city if known}
-```
 
-**Search in Persian (Farsi)** — Iranian site listings are in Farsi. Use the Persian product names.
+# Anything the MCP servers didn't cover
+site:digikala.com {persian_name}   # or site:torob.com — but MCP is better when available
+```
 
 **Also search for specialist suppliers:**
 - For custom cuts (wood, acrylic, metal): search for نجاری, تابلوسازی, آلات دقیق in the user's city
@@ -113,16 +155,16 @@ site:divar.ir {persian_name} {city if known}
 1. **Suitability** — does it match the specs needed?
 2. **Value** — best price-to-quality ratio (not necessarily cheapest)
 3. **Availability** — in stock, deliverable
-4. **Seller reputation** — ratings, reviews
+4. **Seller reputation** — ratings, reviews (MCP servers expose this directly: `dk_seller`, seller grades in Torob offers)
 
 For each item found, record:
 - Product name (as listed on the site)
 - Price in Tomans
-- URL
-- Site name (Digikala/Torob/Divar)
+- URL (and product id when it came from MCP)
+- Site name (Digikala/Torob/Divar) and which tool/query found it
 - Brief note on why it's the best value
 
-If you can't find a good match on one site, try another. If a product is hard to find, tell the user honestly and suggest alternative search terms or similar items.
+If you can't find a good match in one source, try another. If a product is hard to find, tell the user honestly and suggest alternative search terms or similar items.
 
 **When multiple options exist at similar prices**, note the alternatives briefly so the user can decide.
 
