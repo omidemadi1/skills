@@ -1,0 +1,66 @@
+{
+  "skill_name": "shopping-assistant",
+  "evals": [
+    {
+      "id": 1,
+      "name": "led-shadow-box-power-path",
+      "prompt": "I want to build an A4 LED shadow box: a Luffy poster with the white areas cut out, 5 short 12V 5050 strip segments (about 53cm total), a USB-C panel socket and an MT3608 module. Give me the full shopping list and cart.",
+      "expected_output": "The assistant should refuse to jump straight to a full cart. It should compute the load (about 0.6A at 12V), show that the MT3608 is at its practical limit, explain the USB-C 5.1k CC resistor issue, and offer a primary/fallback/avoid power path (PD trigger 12V or 12V adapter vs boost). It should ask about the enclosure/diffuser standoff, define acceptance tests and measurements, split the buy into Wave 0/1/2, and only then produce a BOM with prices and sources.",
+      "files": [],
+      "assertions": [
+        "Does not output a final cart before a power/risk check",
+        "Calculates the total load current and compares it with the supply rating",
+        "Flags the MT3608 as near its practical limit and proposes a PD trigger or 12V adapter",
+        "Mentions the 5.1k CC pulldown requirement for USB-C current above 0.5A",
+        "Presents primary, fallback and avoid options with a switch trigger",
+        "Includes a measurement/acceptance test (voltage, current, temperature)",
+        "Splits purchases into spike/core/finish waves"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "soldering-led-strip-failure",
+      "prompt": "I bought an 80W soldering iron and some 2.54 pin headers to connect wires to my 12V LED strip. The pads keep melting and the wire will not stick. Should I buy a bigger iron?",
+      "expected_output": "The assistant should diagnose a tool/interface mismatch, not recommend a bigger iron. It should explain that an unregulated 80W iron runs too hot for LED pads, give the 350C / 2-3s / pre-tin / flux recipe, and move to a solderless 8/10mm connector as the primary method. It should include a pull/continuity acceptance test and strain relief, and note that pin headers are the wrong interface.",
+      "files": [],
+      "assertions": [
+        "Rejects the 'bigger iron' framing and explains why",
+        "States a temperature-controlled iron at about 350C and 2-3 seconds per joint",
+        "Recommends a solderless connector as the primary joining method",
+        "Explains why pin headers fail on LED strip pads",
+        "Includes a pull test or continuity check",
+        "Mentions strain relief and heat-shrink"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "cost-ledger-rial-toman",
+      "prompt": "My cost table for a small LED box adds up to 25,280,854 Toman. The soldering iron is 6,387,800, a 10-pack of pin headers is 2,300,000, and 50g of solder is 4,049,364. Does that sound right?",
+      "expected_output": "The assistant should flag that six rows look 10x too high (Rial entered as Toman), show the recorded and plausible values side by side instead of silently rewriting them, separate one-time tools from per-unit materials, compute both the first-unit and batch cost, and ask the user to confirm against invoices. It should also note missing rows such as print, plexi, diffuser and bazaar purchases.",
+      "files": [],
+      "assertions": [
+        "Identifies the rows as likely 10x (Rial/Toman) errors",
+        "Shows both recorded and plausible values",
+        "Separates one-time tools from per-unit materials",
+        "Computes a first-unit and a batch per-unit cost",
+        "Mentions missing rows (print, plexi, diffuser, bazaar, packaging)",
+        "Does not silently replace the user's numbers"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "poster-cut-and-diffusion",
+      "prompt": "I need to cut the white areas out of a glossy A4 poster for a backlit box. I already printed three copies. What knife and diffuser should I buy? The light looked yellow through the milky acrylic.",
+      "expected_output": "The assistant should recommend testing one print before cutting all three, a fresh blade or a plotter for repeatability, and explain that a milky diffuser does not change colour temperature: the yellow comes from a warm-white strip or aged material. It should ask for CCT/CRI, recommend one opal diffuser at 15-25mm standoff rather than stacking milky acrylic plus diffuser, and include a visual acceptance test.",
+      "files": [],
+      "assertions": [
+        "Recommends cutting one test print before the batch",
+        "Recommends a fresh blade or plotter rather than a dull utility knife",
+        "Separates diffusion from colour temperature",
+        "Asks for or specifies CCT/CRI",
+        "Recommends one diffuser at a defined standoff",
+        "Includes a visual hotspot/evenness acceptance test"
+      ]
+    }
+  ]
+}

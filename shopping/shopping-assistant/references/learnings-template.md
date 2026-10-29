@@ -1,53 +1,85 @@
-# Shopping Assistant — Learnings
+# Shopping Assistant — Learnings (template)
 
-> This file accumulates knowledge across all projects. It is loaded at the start of every new project
-> and updated whenever the user provides feedback.
+> Copy this to start a learnings file, or add the missing sections to an existing one.
+> It accumulates knowledge across all projects: loaded at the start of every new project, updated
+> whenever the user gives feedback. The live file for this user is `references/learnings.md`.
 
 ## Material Preferences
 
 <!-- What materials the user prefers and why -->
-<!-- Example: "For outdoor signs: always use aluminum composite, not wood (wood rots)" -->
-<!-- Example: "Acrylic 5mm minimum for signboards, 3mm is too flimsy" -->
+<!-- Example: "For outdoor signs: aluminum composite, not wood (wood rots)" -->
+<!-- Example: "Acrylic 5mm minimum for signboards; 3mm is too flimsy" -->
 
-_No learnings yet. This section will grow as you complete projects._
+_No learnings yet._
 
-## Common Mistakes
+## Component Substitution Ledger
 
-<!-- Things that went wrong — avoid repeating them -->
-<!-- Example: "3mm acrylic too thin for 60cm+ spans — use 5mm" -->
-<!-- Example: "Don't buy cheap spray paint, it peels in sun" -->
+<!-- For each critical component: primary → fallback → avoid, plus the trigger to switch.
+     This is the most reused section — it stops the same trade-off being rediscovered. -->
+
+| Category | Primary | Fallback | Avoid | Switch trigger |
+|---|---|---|---|---|
+| Power inlet | | | | |
+| LED | | | | |
+| Joining | | | | |
+| Switch | | | | |
+| Diffusion | | | | |
+| Adhesive | | | | |
+| Cutting | | | | |
+| Enclosure | | | | |
+
+_No learnings yet._
+
+## Common Mistakes & Process Failures
+
+<!-- Things that went wrong — avoid repeating them. Prefer root cause over symptom. -->
+<!-- Example: "Bought the full BOM before testing the risky step → wasted X" -->
+<!-- Example: "Recommended a part from its title only; the spec said 1-in/1-out" -->
+
+_No learnings yet._
+
+## Measurement Benchmarks
+
+<!-- What "normal" looks like, so an abnormal reading is obvious. -->
+<!-- Example: "5050 12V strip: ~1.2A per metre. 53cm ≈ 0.6A." -->
+<!-- Example: "Driver case should stay <60°C after 10 min at full load." -->
 
 _No learnings yet._
 
 ## Site Insights
 
 <!-- Which Iranian sites are cheapest/best for which categories -->
-<!-- Example: "Torob is usually cheaper for raw materials (metal, wood, acrylic)" -->
-<!-- Example: "Digikala is better for power tools (warranty + delivery)" -->
-<!-- Example: "Divar is good for second-hand equipment" -->
+
+_No learnings yet._
+
+## Platform Notes
+
+<!-- Cart mechanics, minimums, payment rules, delivery traps -->
 
 _No learnings yet._
 
 ## Tool Inventory
 
-<!-- Tools the user already owns — don't list them again unless upgrade needed -->
-<!-- Example: "- Drill (cordless, 12V)" -->
-<!-- Example: "- Soldering iron" -->
+<!-- Tools the user already owns; note capability, not just name. -->
+<!-- Example: "- Soldering iron: 80W, unregulated → not suitable for LED pads" -->
 
 _No learnings yet._
 
 ## Pricing Benchmarks
 
-<!-- Fair prices for common items — flag overpriced items -->
-<!-- Example: "Aluminum composite ~1.2M toman for 120×240cm (fair price)" -->
-<!-- Example: "Acrylic 5mm 60×120cm ~450K toman" -->
+<!-- Fair prices for common items in Toman; note the date and source. -->
+
+_No learnings yet._
+
+## Failure Post-mortems
+
+<!-- Symptom → root cause → fix → rule. One entry per real failure. -->
 
 _No learnings yet._
 
 ## Supplier Notes
 
-<!-- Local shops, preferred vendors, delivery notes -->
-<!-- Example: "Local metal shop does riveting free with purchase" -->
-<!-- Example: "Digikala delivery usually 2-3 days to my city" -->
+<!-- Local shops, preferred vendors, delivery notes, and the Persian search vocabulary that
+     actually matches the part the user means (ترمینال، ریسه، وارنیش، کاغذ کالک، فوم…) -->
 
 _No learnings yet._
